@@ -1,183 +1,102 @@
 import { useState } from 'react'
 import './App.css'
-
-// MVP
-// - build 1 exercise
-// - A phrase
-// - A bunch of words to choose from
-// - Check if the answer is correct
-
-// Original: Kjo eshte nje fjali ne shqip.
-// Translation: This is a sentence in Albanian.
-
-// Original: Përshëndetje, unë jam Nicolas!
-// Translation: Hello, I'm Nicolas!
-
-type Exercise = {
-  id: number
-  phrase: string
-  availableWords: string[]
-  answer: string
-}
-
-const exercises: Exercise[] = [
-  {
-    id: 1,
-    phrase: 'Kjo eshte nje fjali ne shqip.',
-    answer: 'This is a sentence in Albanian',
-    availableWords: [
-      'sentence',
-      'in',
-      'love',
-      'This',
-      'is',
-      'Russian',
-      'Albanian',
-      'a',
-      'potato'
-    ]
-  },
-  {
-    id: 2,
-    phrase: 'Përshëndetje unë jam Nicolas',
-    answer: 'Hello I am Nicolas',
-    availableWords: ['Hello', 'I', 'am', 'Nicolas', 'How', 'are', 'biscuit']
-  },
-  {
-    id: 3,
-    phrase: 'Unë jam mbret',
-    answer: 'I am king',
-    availableWords: ['I', 'am', 'king', 'queen', 'are', 'be', 'Russian']
-  },
-  {
-    id: 4,
-    phrase: 'Mua më pëlqen të ha patate',
-    answer: 'I enjoy eating potatoes',
-    availableWords: [
-      'I',
-      'enjoy',
-      'eating',
-      'potatoes',
-      'strawberries',
-      'You',
-      "don't"
-    ]
-  }
-]
-
-function randomise (array: any[]) {
-  return [...array].sort(() => Math.random() - 0.5)
-}
-
-function getRandomExercise () {
-  let randomExercise = exercises[Math.floor(Math.random() * exercises.length)]
-  let randomExerciseCopy: Exercise = structuredClone(randomExercise)
-  randomExerciseCopy.availableWords = randomise(
-    randomExerciseCopy.availableWords
-  )
-  return randomExerciseCopy
-}
+import { CorrectResult } from './components/CorrectResult'
+import { ExerciseScreen } from './components/ExerciseScreen'
+import { IncorrectResult } from './components/IncorrectResult'
+import { LostScreen } from './components/LostScreen'
+import { getRandomExercise } from './helpers'
+import { Exercise, Word } from './types'
 
 function App () {
   const [exercise, setExercise] = useState(getRandomExercise())
 
+  const [lives, setLives] = useState(3)
+  const [streak, setStreak] = useState(0)
+
   // words that the user selected
   const [selectedWords, setSelectedWords] = useState<string[]>([])
-
-  // derived state
-  const availableWordsThatHaveNotBeenSelected = exercise.availableWords.filter(
-    word => !selectedWords.includes(word)
-  )
 
   // check if the user has finished their answer or not
   const [userAnswered, setUserAnswered] = useState(false)
   const userAnsweredCorrectly = exercise.answer === selectedWords.join(' ')
 
+  function deselectWord (word: string, index: number) {
+    let selectedWordsCopy = structuredClone(selectedWords)
+    selectedWordsCopy.splice(index, 1)
+
+    let exerciseCopy: Exercise = structuredClone(exercise)
+    let match = exerciseCopy.availableWords.find(
+      target => target.value === word && target.selected === true
+    )!
+    match.selected = false
+
+    setExercise(exerciseCopy)
+    setSelectedWords(selectedWordsCopy)
+  }
+
+  function selectWord (word: Word) {
+    // find the index of the item I want to change
+    let index = exercise.availableWords.indexOf(word)
+
+    // make a copy of the exercise
+    let exerciseCopy: Exercise = structuredClone(exercise)
+    // change the word to selected: true
+    exerciseCopy.availableWords[index].selected = true
+
+    // update state
+    setExercise(exerciseCopy)
+    setSelectedWords([...selectedWords, word.value])
+  }
+
+  function checkAnswer () {
+    if (exercise.answer !== selectedWords.join(' ')) {
+      setLives(lives - 1)
+    } else {
+      setStreak(streak + 1)
+    }
+    setUserAnswered(true)
+  }
+
   return (
     <div className='App'>
-      <h1>Translate into English</h1>
-      <h2>{exercise.phrase}</h2>
+      {lives === 0 ? (
+        <LostScreen
+          setLives={setLives}
+          setStreak={setStreak}
+          setSelectedWords={setSelectedWords}
+          setExercise={setExercise}
+          setUserAnswered={setUserAnswered}
+        />
+      ) : (
+        <ExerciseScreen
+          exercise={exercise}
+          selectedWords={selectedWords}
+          userAnswered={userAnswered}
+          lives={lives}
+          streak={streak}
+          deselectWord={deselectWord}
+          selectWord={selectWord}
+          checkAnswer={checkAnswer}
+        />
+      )}
 
-      <section className='selected-words'>
-        <ul>
-          {selectedWords.map(word => (
-            <li>
-              <button
-                className='word'
-                disabled={userAnswered}
-                onClick={() => {
-                  const updatedSelectedWords = selectedWords.filter(
-                    target => target !== word
-                  )
-                  setSelectedWords(updatedSelectedWords)
-                }}
-              >
-                {word}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <CorrectResult
+        userAnswered={userAnswered}
+        userAnsweredCorrectly={userAnsweredCorrectly}
+        setExercise={setExercise}
+        setSelectedWords={setSelectedWords}
+        setUserAnswered={setUserAnswered}
+      />
 
-      <section className='unselected-words'>
-        <ul>
-          {availableWordsThatHaveNotBeenSelected.map(word => (
-            <li>
-              <button
-                className='word'
-                disabled={userAnswered}
-                onClick={() => {
-                  setSelectedWords([...selectedWords, word])
-                }}
-              >
-                {word}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className='check'>
-        <button
-          className='check-button'
-          disabled={selectedWords.length === 0}
-          onClick={() => {
-            setUserAnswered(true)
-          }}
-        >
-          CHECK
-        </button>
-      </section>
-
-      {userAnswered && userAnsweredCorrectly ? (
-        <div className='result correct'>
-          <h3>You got it right! 🎉</h3>
-          <button
-            onClick={() => {
-              setExercise(getRandomExercise())
-              setSelectedWords([])
-              setUserAnswered(false)
-            }}
-          >
-            Continue
-          </button>
-        </div>
-      ) : null}
-      {userAnswered && !userAnsweredCorrectly ? (
-        <div className='result incorrect'>
-          <h3>Sorry, that is incorrect. 🙈</h3>
-          <p>The correct answer is: "{exercise.answer}"</p>
-          <button
-            onClick={() => {
-              setExercise(getRandomExercise())
-              setSelectedWords([])
-              setUserAnswered(false)
-            }}
-          >
-            Continue
-          </button>
-        </div>
-      ) : null}
+      <IncorrectResult
+        userAnswered={userAnswered}
+        userAnsweredCorrectly={userAnsweredCorrectly}
+        exercise={exercise}
+        lives={lives}
+        setExercise={setExercise}
+        setSelectedWords={setSelectedWords}
+        setUserAnswered={setUserAnswered}
+      />
     </div>
   )
 }
